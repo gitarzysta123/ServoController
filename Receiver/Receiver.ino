@@ -4,12 +4,12 @@
 #define SERVOS 3  //Liczba serw fizycznie możliwych do podłączenia
 
 //bool servoEnable[SERVOS] = {1, 1, 1};
-const String filePrefix = "Servo"; //Prefiks pliku scenariusza
+const String filePrefix = "Servo";  //Prefiks pliku scenariusza
 
-unsigned long time1 = 0;
-int servoIndex[SERVOS]; //Numer serwomechaniuzmu
-unsigned int fileSize[SERVOS]; //Liczba linijek scenariusza
-int numOfFiles = 0;
+
+int servoIndex[SERVOS];         //Numer serwomechanizmu
+unsigned int fileSize[SERVOS];  //Liczba linijek scenariusza
+int numOfFiles = 0;             //Liczba plików scenariusza na karcie SD
 
 void setup() {
   Serial.begin(115200);
@@ -34,10 +34,10 @@ void setup() {
 
 
 
-  while (true) {  //Zbieranie danych o plikach
+  while (true) {  //Zbieranie danych o plikach scenariusza
     File file_temp = root.openNextFile();
     if (file_temp) {
-      String fileName = file_temp.name(); //Przepisanie numero serwo
+      String fileName = file_temp.name();
       if (fileName.startsWith(filePrefix)) {
         fileSize[numOfFiles] = countLines(file_temp);
         servoIndex[numOfFiles] = 0;
@@ -62,14 +62,14 @@ void setup() {
   }
   root.close();
 
-  unsigned int **timeStamps = new unsigned int *[numOfFiles]; //Alokacja pamięci
+  unsigned int **timeStamps = new unsigned int *[numOfFiles];  //Alokacja pamięci
   int **positions = new int *[numOfFiles];
   for (int i = 0; i < numOfFiles; i++) {
     timeStamps[i] = new unsigned int[fileSize[i]];
     positions[i] = new int[fileSize[i]];
   }
 
-  for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) { //Przpisywanie .csv do pamięci
+  for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {  //Przpisywanie .csv do pamięci
     Serial.println("\n" + filePrefix + servoIndex[arrayIndex] + ".csv");
 
     File file = SD.open("/" + filePrefix + servoIndex[arrayIndex] + ".csv", FILE_READ);
@@ -87,6 +87,53 @@ void setup() {
 
     if (lineIndex != fileSize[arrayIndex]) {
       Serial.println("Error: Array lenght not equal to file length");
+    }
+  }
+
+  delay(1000);
+  Serial.println("\nSTART SCENARIO?\n");
+  while (digitalRead(0)) {}
+
+  Serial.print("time");  // Convert millis() to a String
+        Serial.print("\t");              // Tab character
+        Serial.print("file");
+        Serial.print("\t");  // Tab character
+        Serial.print("line");
+        Serial.print("\t");  // Tab character
+        Serial.println("pos");
+
+  int *currentLine = new int[numOfFiles];
+  bool *stop = new bool[numOfFiles];
+  bool STOP = 0;
+  for (int i = 0; i < numOfFiles; i++) {
+    currentLine[i] = 0;
+    stop[i] = false;
+  }
+
+  unsigned long time1 = millis();
+
+  while (!STOP) {
+    for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
+      if ((millis() - time1) >= timeStamps[arrayIndex][currentLine[arrayIndex]] && stop[arrayIndex] == 0) {
+
+        Serial.print(String(millis() - time1));  // Convert millis() to a String
+        Serial.print("\t");              // Tab character
+        Serial.print(arrayIndex);
+        Serial.print("\t");  // Tab character
+        Serial.print(currentLine[arrayIndex]);
+        Serial.print("\t");  // Tab character
+        Serial.println(positions[arrayIndex][currentLine[arrayIndex]]);
+        
+        currentLine[arrayIndex]++;
+        if (currentLine[arrayIndex] == fileSize[arrayIndex]) {
+          stop[arrayIndex] = true;
+        }
+      }
+    }
+
+    STOP = 1;
+    for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
+      STOP = STOP * stop[arrayIndex];
     }
   }
 }
