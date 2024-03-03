@@ -4,14 +4,12 @@
 #define SERVOS 3  //Liczba serw fizycznie możliwych do podłączenia
 
 //bool servoEnable[SERVOS] = {1, 1, 1};
-const String filePrefix = "Servo";
+const String filePrefix = "Servo"; //Prefiks pliku scenariusza
 
 unsigned long time1 = 0;
-int lineCount[SERVOS];
-int servoIndex[SERVOS];
-unsigned int fileSize[SERVOS];
+int servoIndex[SERVOS]; //Numer serwomechaniuzmu
+unsigned int fileSize[SERVOS]; //Liczba linijek scenariusza
 int numOfFiles = 0;
-unsigned int longestFileSize = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -36,10 +34,10 @@ void setup() {
 
 
 
-  while (true) {
+  while (true) {  //Zbieranie danych o plikach
     File file_temp = root.openNextFile();
     if (file_temp) {
-      String fileName = file_temp.name();
+      String fileName = file_temp.name(); //Przepisanie numero serwo
       if (fileName.startsWith(filePrefix)) {
         fileSize[numOfFiles] = countLines(file_temp);
         servoIndex[numOfFiles] = 0;
@@ -64,38 +62,37 @@ void setup() {
   }
   root.close();
 
-  longestFileSize = getMaxLength(fileSize, numOfFiles);
-  Serial.print("\nMAX LENGTH: ");
-  Serial.println(longestFileSize);
+  unsigned int **timeStamps = new unsigned int *[numOfFiles]; //Alokacja pamięci
+  int **positions = new int *[numOfFiles];
+  for (int i = 0; i < numOfFiles; i++) {
+    timeStamps[i] = new unsigned int[fileSize[i]];
+    positions[i] = new int[fileSize[i]];
+  }
 
-  unsigned int timeStamps[numOfFiles][longestFileSize];
-  int positions[numOfFiles][longestFileSize];
-
-  for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
+  for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) { //Przpisywanie .csv do pamięci
     Serial.println("\n" + filePrefix + servoIndex[arrayIndex] + ".csv");
+
     File file = SD.open("/" + filePrefix + servoIndex[arrayIndex] + ".csv", FILE_READ);
+
     int lineIndex = 0;
     while (file.available()) {
       timeStamps[arrayIndex][lineIndex] = file.readStringUntil(';').toInt();
-      if (lineIndex != 0 && timeStamps[arrayIndex][lineIndex] == 0){
+      if (lineIndex != 0 && timeStamps[arrayIndex][lineIndex] == 0) {
         break;
       }
       positions[arrayIndex][lineIndex] = file.readStringUntil('\n').toInt();
-      Serial.print(arrayIndex);
-      Serial.print(" , ");
-      Serial.print(lineIndex);
-      Serial.print(" : ");
-      Serial.print(timeStamps[arrayIndex][lineIndex]);
-      Serial.print(";");
-      Serial.println(positions[arrayIndex][lineIndex]);
+      serialPrintLine(timeStamps, positions, arrayIndex, lineIndex);
       lineIndex++;
+    }
+
+    if (lineIndex != fileSize[arrayIndex]) {
+      Serial.println("Error: Array lenght not equal to file length");
     }
   }
 }
 
 void loop() {
 }
-
 
 unsigned int countLines(File file) {
   unsigned int lineCount = 0;
@@ -122,12 +119,12 @@ unsigned int countLines(File file) {
   return lineCount;
 }
 
-unsigned int getMaxLength(unsigned int file[], int num) {
-  unsigned int maxLength = file[0];
-  for (int i = 1; i < num; i++) {
-    if (file[i] > maxLength) {
-      maxLength = file[i];
-    }
-  }
-  return maxLength;
+void serialPrintLine(unsigned int **array1, int **array2, int array_index, unsigned int line_index) {
+  Serial.print(array_index);
+  Serial.print(" , ");
+  Serial.print(line_index);
+  Serial.print(" : ");
+  Serial.print(array1[array_index][line_index]);
+  Serial.print(";");
+  Serial.println(array2[array_index][line_index]);
 }
