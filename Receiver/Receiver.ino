@@ -7,16 +7,16 @@
 const String filePrefix = "Servo";  //Prefiks pliku scenariusza
 
 
-int servoIndex[SERVOS];         //Numer serwomechanizmu
-unsigned int fileSize[SERVOS];  //Liczba linijek scenariusza
-int numOfFiles = 0;             //Liczba plików scenariusza na karcie SD
+int servoIndex[SERVOS];  //Numer serwomechanizmu
+int fileSize[SERVOS];    //Liczba linijek scenariusza
+int numOfFiles = 0;      //Liczba plików scenariusza na karcie SD
 
 void setup() {
   Serial.begin(115200);
 
   pinMode(0, INPUT_PULLUP);
-  while (digitalRead(0)) {}
-  delay(2000);
+  while (digitalRead(0)) {}  // CZEKA NA PRZYCISK ID0
+  delay(2000);               //roboczo
 
   while (!SD.begin()) {
     Serial.println("Error: Card error");
@@ -47,11 +47,7 @@ void setup() {
           servoIndex[numOfFiles] = fileName[filePrefix.length()] - '0';
         }
 
-        Serial.println("Found scenario file: " + fileName);
-        Serial.print("Size: ");
-        Serial.print(fileSize[numOfFiles]);
-        Serial.print("  Servo index: ");
-        Serial.println(servoIndex[numOfFiles]);
+        serialPrintFileData(fileName, fileSize[numOfFiles], servoIndex[numOfFiles]);
 
         numOfFiles++;
       }
@@ -62,10 +58,10 @@ void setup() {
   }
   root.close();
 
-  unsigned int **timeStamps = new unsigned int *[numOfFiles];  //Alokacja pamięci
+  int **timeStamps = new int *[numOfFiles];  //Alokacja pamięci
   int **positions = new int *[numOfFiles];
   for (int i = 0; i < numOfFiles; i++) {
-    timeStamps[i] = new unsigned int[fileSize[i]];
+    timeStamps[i] = new int[fileSize[i]];
     positions[i] = new int[fileSize[i]];
   }
 
@@ -81,7 +77,8 @@ void setup() {
         break;
       }
       positions[arrayIndex][lineIndex] = file.readStringUntil('\n').toInt();
-      serialPrintLine(timeStamps, positions, arrayIndex, lineIndex);
+
+      serialPrintLine(timeStamps[arrayIndex][lineIndex], positions[arrayIndex][lineIndex], arrayIndex, lineIndex);
       lineIndex++;
     }
 
@@ -90,88 +87,111 @@ void setup() {
     }
   }
 
-  delay(1000);
   Serial.println("\nSTART SCENARIO?\n");
-  while (digitalRead(0)) {}
+  while (digitalRead(0)) {}  // CZEKA NA PRZYCISK ID0
+  delay(500);                //roboczo
 
-  Serial.print("time");  // Convert millis() to a String
-        Serial.print("\t");              // Tab character
-        Serial.print("file");
-        Serial.print("\t");  // Tab character
-        Serial.print("line");
-        Serial.print("\t");  // Tab character
-        Serial.println("pos");
+  Serial.println("time\tfile\tline\tpos");
 
-  int *currentLine = new int[numOfFiles];
-  bool *stop = new bool[numOfFiles];
-  bool STOP = 0;
+  int *currentLine = new int[numOfFiles];  //flagi, iteratory
+  bool *fileEnded = new bool[numOfFiles];
+  bool allFilesEnded = 0;
   for (int i = 0; i < numOfFiles; i++) {
     currentLine[i] = 0;
-    stop[i] = false;
+    fileEnded[i] = false;
   }
 
   unsigned long time1 = millis();
 
-  while (!STOP) {
+  while (!allFilesEnded) {  //czytanie pozycji w czasie
     for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
-      if ((millis() - time1) >= timeStamps[arrayIndex][currentLine[arrayIndex]] && stop[arrayIndex] == 0) {
+      if ((millis() - time1) >= timeStamps[arrayIndex][currentLine[arrayIndex]] && fileEnded[arrayIndex] == 0) {
 
-        Serial.print(String(millis() - time1));  // Convert millis() to a String
-        Serial.print("\t");              // Tab character
-        Serial.print(arrayIndex);
-        Serial.print("\t");  // Tab character
-        Serial.print(currentLine[arrayIndex]);
-        Serial.print("\t");  // Tab character
-        Serial.println(positions[arrayIndex][currentLine[arrayIndex]]);
-        
+        serialPrintPositionLine(time1, arrayIndex, currentLine[arrayIndex], positions[arrayIndex][currentLine[arrayIndex]]);
+
         currentLine[arrayIndex]++;
         if (currentLine[arrayIndex] == fileSize[arrayIndex]) {
-          stop[arrayIndex] = true;
+          fileEnded[arrayIndex] = true;
+
+          Serial.print("\nEND OF FILE ");
+          Serial.println(arrayIndex);
+          Serial.print("\n");
         }
       }
     }
 
-    STOP = 1;
+    allFilesEnded = 1;
     for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
-      STOP = STOP * stop[arrayIndex];
+      allFilesEnded = allFilesEnded * fileEnded[arrayIndex];
     }
   }
+
+
+  Serial.println("\nEND OF ALL FILES.");
+
+  delete[] timeStamps;  //usuwanie dynamicznych
+  delete[] positions;
+  for (int i = 0; i < numOfFiles; i++) {
+    delete[] timeStamps[i];
+    delete[] positions[i];
+  }
+  delete[] currentLine;
+  delete[] fileEnded;
+  Serial.println("Deleted dynamic arrays");  //roboczo
 }
 
 void loop() {
 }
 
-unsigned int countLines(File file) {
-  unsigned int lineCount = 0;
-  bool wasEmpty = 0;
-  char c;
-  while (file.available()) {
-    c = file.read();
-    if (c != '\r') {
-      if (c == '\n') {
-        if (!wasEmpty) {
-          lineCount++;
-          wasEmpty = true;
+int countLines(File _file) {  //liczenie linijek w pliku
+  int _lineCount = 0;
+  bool _wasEmpty = 0;
+  char _c;
+  while (_file.available()) {
+    _c = _file.read();
+    if (_c != '\r') {
+      if (_c == '\n') {
+        if (!_wasEmpty) {
+          _lineCount++;
+          _wasEmpty = true;
         } else {
-          return lineCount;
+          return _lineCount;
         }
       } else {
-        wasEmpty = false;
+        _wasEmpty = false;
       }
     }
   }
-  if (!wasEmpty) {
-    lineCount++;
+  if (!_wasEmpty) {
+    _lineCount++;
   }
-  return lineCount;
+  return _lineCount;
 }
 
-void serialPrintLine(unsigned int **array1, int **array2, int array_index, unsigned int line_index) {
-  Serial.print(array_index);
+void serialPrintFileData(String _file_name, int _file_size, int _servo_index) {
+  Serial.println("\nFound scenario file: " + _file_name);
+  Serial.print("Size: ");
+  Serial.print(_file_size);
+  Serial.print("  Servo index: ");
+  Serial.println(_servo_index);
+}
+
+void serialPrintLine(int _time, int _position, int _array_index, int _line_index) {
+  Serial.print(_array_index);
   Serial.print(" , ");
-  Serial.print(line_index);
+  Serial.print(_line_index);
   Serial.print(" : ");
-  Serial.print(array1[array_index][line_index]);
+  Serial.print(_time);
   Serial.print(";");
-  Serial.println(array2[array_index][line_index]);
+  Serial.println(_position);
+}
+
+void serialPrintPositionLine(unsigned long _time1, int _array_index, int _current_line, int _position) {
+  Serial.print(String(millis() - _time1));
+  Serial.print("\t");
+  Serial.print(_array_index);
+  Serial.print("\t");
+  Serial.print(_current_line);
+  Serial.print("\t");
+  Serial.println(_position);
 }
