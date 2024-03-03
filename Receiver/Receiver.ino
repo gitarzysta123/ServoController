@@ -11,6 +11,7 @@ int lineCount[SERVOS];
 int servoIndex[SERVOS];
 unsigned int fileSize[SERVOS];
 int numOfFiles = 0;
+unsigned int longestFileSize = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -61,12 +62,33 @@ void setup() {
       break;
     }
   }
-  Serial.println(filePrefix + servoIndex[0] + ".csv");
+  root.close();
 
-  for (int arrayIndex = 0;  arrayIndex < numOfFiles; arrayIndex++) {
-    File file = SD.open(filePrefix + servoIndex[arrayIndex] + ".csv", FILE_READ);
+  longestFileSize = getMaxLength(fileSize, numOfFiles);
+  Serial.print("\nMAX LENGTH: ");
+  Serial.println(longestFileSize);
+
+  unsigned int timeStamps[numOfFiles][longestFileSize];
+  int positions[numOfFiles][longestFileSize];
+
+  for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
+    Serial.println("\n" + filePrefix + servoIndex[arrayIndex] + ".csv");
+    File file = SD.open("/" + filePrefix + servoIndex[arrayIndex] + ".csv", FILE_READ);
+    int lineIndex = 0;
     while (file.available()) {
-      Serial.write(file.read());
+      timeStamps[arrayIndex][lineIndex] = file.readStringUntil(';').toInt();
+      if (lineIndex != 0 && timeStamps[arrayIndex][lineIndex] == 0){
+        break;
+      }
+      positions[arrayIndex][lineIndex] = file.readStringUntil('\n').toInt();
+      Serial.print(arrayIndex);
+      Serial.print(" , ");
+      Serial.print(lineIndex);
+      Serial.print(" : ");
+      Serial.print(timeStamps[arrayIndex][lineIndex]);
+      Serial.print(";");
+      Serial.println(positions[arrayIndex][lineIndex]);
+      lineIndex++;
     }
   }
 }
@@ -98,4 +120,14 @@ unsigned int countLines(File file) {
     lineCount++;
   }
   return lineCount;
+}
+
+unsigned int getMaxLength(unsigned int file[], int num) {
+  unsigned int maxLength = file[0];
+  for (int i = 1; i < num; i++) {
+    if (file[i] > maxLength) {
+      maxLength = file[i];
+    }
+  }
+  return maxLength;
 }
