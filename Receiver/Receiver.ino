@@ -87,42 +87,90 @@ void setup() {
     }
   }
 
-  Serial.println("\nSTART SCENARIO?\n");
-  while (digitalRead(0)) {}  // CZEKA NA PRZYCISK ID0
-  delay(500);                //roboczo
-
-  Serial.println("time\tfile\tline\tpos");
-
   int *currentLine = new int[numOfFiles];  //flagi, iteratory
+  int *currentPosition = new int[numOfFiles];
+  int *oldPosition = new int[numOfFiles];
+  int *timeStep = new int[numOfFiles];
+  int *direction = new int[numOfFiles];
+  unsigned long *timeC = new unsigned long[numOfFiles];
   bool *fileEnded = new bool[numOfFiles];
   bool allFilesEnded = 0;
   for (int i = 0; i < numOfFiles; i++) {
-    currentLine[i] = 0;
+    currentLine[i] = 1;
     fileEnded[i] = false;
+    currentPosition[i] = positions[i][0];
+    serialPrintPositionLine(millis(), i, 0, currentPosition[i]);
+    int posDiff = positions[i][currentLine[i]] - positions[i][currentLine[i] - 1];
+    if (posDiff > 0) {
+      direction[i] = 1;
+    } else if (posDiff < 0) {
+      direction[i] = -1;
+    } else {
+      direction[i] = 0;
+    }
+    posDiff = abs(posDiff);
+    if (posDiff != 0) {
+      timeStep[i] = (timeStamps[i][currentLine[i]] - timeStamps[i][currentLine[i] - 1]) / posDiff;
+    } else {
+      timeStep[i] = timeStamps[i][currentLine[i]] - timeStamps[i][currentLine[i] - 1];
+    }
+    Serial.print("Timestep : ");
+    Serial.println(timeStep[i]);
   }
 
+  Serial.println("\nSTART SCENARIO?\n");
+  Serial.println("time\tfile\tline\tpos");
+  while (digitalRead(0)) {}  // CZEKA NA PRZYCISK ID0
+  delay(500);                //roboczo
+
+
+
+
+
+
   unsigned long time1 = millis();
+  for (int i = 0; i < numOfFiles; i++) {
+    timeC[i] = millis();
+  }
 
   while (!allFilesEnded) {  //czytanie pozycji w czasie
     for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
-      if ((millis() - time1) >= timeStamps[arrayIndex][currentLine[arrayIndex]] && fileEnded[arrayIndex] == 0) {
+      if ((millis() >= (timeC[arrayIndex] + timeStep[arrayIndex])) && (fileEnded[arrayIndex] == false)) {
+        currentPosition[arrayIndex] += direction[arrayIndex];
+        timeC[arrayIndex] = millis();
 
-        serialPrintPositionLine(time1, arrayIndex, currentLine[arrayIndex], positions[arrayIndex][currentLine[arrayIndex]]);
+        serialPrintPositionLine(millis() - time1, arrayIndex, currentLine[arrayIndex], currentPosition[arrayIndex]);
 
-        currentLine[arrayIndex]++;
-        if (currentLine[arrayIndex] == fileSize[arrayIndex]) {
-          fileEnded[arrayIndex] = true;
+        if (currentPosition[arrayIndex] == positions[arrayIndex][currentLine[arrayIndex]]) {
+          currentLine[arrayIndex]++;
 
-          Serial.print("\nEND OF FILE ");
-          Serial.println(arrayIndex);
-          Serial.print("\n");
+          if (currentLine[arrayIndex] == fileSize[arrayIndex]) {
+            fileEnded[arrayIndex] = true;
+
+            allFilesEnded = 1;
+            for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
+              allFilesEnded = allFilesEnded * fileEnded[arrayIndex];
+            }
+          } else {
+            int posDiff = positions[arrayIndex][currentLine[arrayIndex]] - positions[arrayIndex][currentLine[arrayIndex] - 1];
+            if (posDiff > 0) {
+              direction[arrayIndex] = 1;
+            } else if (posDiff < 0) {
+              direction[arrayIndex] = -1;
+            } else {
+              direction[arrayIndex] = 0;
+            }
+            posDiff = abs(posDiff);
+            if (posDiff != 0) {
+              timeStep[arrayIndex] = (timeStamps[arrayIndex][currentLine[arrayIndex]] - timeStamps[arrayIndex][currentLine[arrayIndex] - 1]) / posDiff;
+            } else {
+              timeStep[arrayIndex] = timeStamps[arrayIndex][currentLine[arrayIndex]] - timeStamps[arrayIndex][currentLine[arrayIndex] - 1];
+            }
+            Serial.print("Timestep : ");
+            Serial.println(timeStep[arrayIndex]);
+          }
         }
       }
-    }
-
-    allFilesEnded = 1;
-    for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
-      allFilesEnded = allFilesEnded * fileEnded[arrayIndex];
     }
   }
 
@@ -187,7 +235,7 @@ void serialPrintLine(int _time, int _position, int _array_index, int _line_index
 }
 
 void serialPrintPositionLine(unsigned long _time1, int _array_index, int _current_line, int _position) {
-  Serial.print(String(millis() - _time1));
+  Serial.print(String(_time1));
   Serial.print("\t");
   Serial.print(_array_index);
   Serial.print("\t");
