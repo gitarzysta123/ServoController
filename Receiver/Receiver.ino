@@ -128,11 +128,13 @@ void setup() {
 
 
 
-  unsigned long time1 = millis();
+  
   for (int i = 0; i < numOfFiles; i++) {
     timeC[i] = millis();
   }
 
+  unsigned long time1 = millis();
+  
   while (!allFilesEnded) {  //czytanie pozycji w czasie
     for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
       if ((millis() >= (timeC[arrayIndex] + timeStep[arrayIndex])) && (fileEnded[arrayIndex] == false)) {
@@ -166,8 +168,11 @@ void setup() {
             } else {
               timeStep[arrayIndex] = timeStamps[arrayIndex][currentLine[arrayIndex]] - timeStamps[arrayIndex][currentLine[arrayIndex] - 1];
             }
-            Serial.print("Timestep : ");
+            Serial.print("Timestep ");
+            Serial.print(arrayIndex);
+            Serial.print(" : ");
             Serial.println(timeStep[arrayIndex]);
+            timeC[arrayIndex] = time1 + (unsigned long)(timeStamps[arrayIndex][currentLine[arrayIndex] - 1]);
           }
         }
       }
@@ -243,3 +248,4 @@ void serialPrintPositionLine(unsigned long _time1, int _array_index, int _curren
   Serial.print("\t");
   Serial.println(_position);
 }
+
