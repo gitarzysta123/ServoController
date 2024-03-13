@@ -9,7 +9,7 @@
 const String filePrefix = "Servo";  //Prefiks pliku scenariusza
 
 
-int servoIndex[SERVOS];  //Numer serwomechanizmu
+int servoIndex[SERVOS];  //Numer serwomechanizmu z nazwy pliku
 int fileSize[SERVOS];    //Liczba linijek scenariusza
 int numOfFiles = 0;      //Liczba plików scenariusza na karcie SD
 
@@ -93,10 +93,11 @@ void setup() {
     }
 
     if (lineIndex != fileSize[arrayIndex]) {
-      Serial.println("Error: Array lenght not equal to file length");
+      Serial.println("Error: Array length not equal to file length");
     }
   }
 
+  Serial.println("time\tfile\tline\tpos");
 
   for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) { //Przygotowanie do startu scenariusza
     currentLine[arrayIndex] = 1;
@@ -116,7 +117,7 @@ void setup() {
     calcStepDir(arrayIndex, currentLine, positions, direction, timeStep, timeStamps, timeC, time1);
   }
   
-  while (!allFilesEnded) {  //czytanie pozycji w czasie
+  while (!allFilesEnded) {  //czytanie(w przyszłości serwo.write) pozycji w czasie
     for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
       if ((millis() >= (timeC[arrayIndex] + timeStep[arrayIndex])) && (fileEnded[arrayIndex] == false)) {
         currentPosition[arrayIndex] += direction[arrayIndex];

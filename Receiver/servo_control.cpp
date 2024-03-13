@@ -56,7 +56,8 @@ void serialPrintPositionLine(unsigned long _time1, int _array_index, int _curren
 }
 
 void calcStepDir(int _array_index, int _current_line[], int* _positions[], int _direction[], int _time_step[], int* _time_stamps[], unsigned long _time_mark[], unsigned long _time_start) {
-  int posDiff = _positions[_array_index][_current_line[_array_index]] - _positions[_array_index][_current_line[_array_index] - 1];
+  int _last_line = _current_line[_array_index] - 1;
+  int posDiff = _positions[_array_index][_current_line[_array_index]] - _positions[_array_index][_last_line];
             if (posDiff > 0) {
               _direction[_array_index] = 1;
             } else if (posDiff < 0) {
@@ -68,9 +69,9 @@ void calcStepDir(int _array_index, int _current_line[], int* _positions[], int _
             posDiff = abs(posDiff);
 
             if (posDiff != 0) {
-              _time_step[_array_index] = (_time_stamps[_array_index][_current_line[_array_index]] - _time_stamps[_array_index][_current_line[_array_index] - 1]) / posDiff;
+              _time_step[_array_index] = (_time_stamps[_array_index][_current_line[_array_index]] - _time_stamps[_array_index][_last_line]) / posDiff;
             } else {
-              _time_step[_array_index] = _time_stamps[_array_index][_current_line[_array_index]] - _time_stamps[_array_index][_current_line[_array_index] - 1];
+              _time_step[_array_index] = _time_stamps[_array_index][_current_line[_array_index]] - _time_stamps[_array_index][_last_line];
             }
 
             Serial.print("Timestep ");
@@ -78,5 +79,5 @@ void calcStepDir(int _array_index, int _current_line[], int* _positions[], int _
             Serial.print(" : ");
             Serial.println(_time_step[_array_index]);
 
-            _time_mark[_array_index] = _time_start + (unsigned long)(_time_stamps[_array_index][_current_line[_array_index] - 1]);
+            _time_mark[_array_index] = _time_start + (unsigned long)(_time_stamps[_array_index][_last_line]);
 }
