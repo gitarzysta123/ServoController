@@ -17,10 +17,12 @@ int numOfFiles = 0;      //Liczba plików scenariusza na karcie SD
 void setup() {
   Serial.begin(115200);
 
+  
+
   pinMode(0, INPUT_PULLUP);
   while (digitalRead(0)) {}  // CZEKA NA PRZYCISK ID0
   delay(2000);               //roboczo
-
+  Serial.println(sizeof(int));  // size in bytes
   while (!SD.begin()) {
     Serial.println("Error: Card error");
     while (digitalRead(0)) {}
@@ -81,19 +83,15 @@ void setup() {
     File file = SD.open("/" + filePrefix + servoIndex[arrayIndex] + ".csv", FILE_READ);
 
     int lineIndex = 0;
-    while (file.available()) {
+    for (int lineIndex = 0; lineIndex < fileSize[arrayIndex] && file.available(); lineIndex++) {
       timeStamps[arrayIndex][lineIndex] = file.readStringUntil(';').toInt();
       if (lineIndex != 0 && timeStamps[arrayIndex][lineIndex] == 0) {
+        Serial.println("Error: Incorrect timestamp");
         break;
       }
       positions[arrayIndex][lineIndex] = file.readStringUntil('\n').toInt();
 
       serialPrintLine(timeStamps[arrayIndex][lineIndex], positions[arrayIndex][lineIndex], arrayIndex, lineIndex); //Robocze, wyświetla linijkę pliku
-      lineIndex++;
-    }
-
-    if (lineIndex != fileSize[arrayIndex]) {
-      Serial.println("Error: Array length not equal to file length");
     }
   }
 
