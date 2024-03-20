@@ -1,6 +1,6 @@
 #include <SPI.h>
 #include <SD.h>
-
+#include "Scenario.h"
 #include "servo_control.h"
 
 #define SERVOS 3  //Liczba serw fizycznie możliwych do podłączenia
@@ -12,6 +12,8 @@ const String filePrefix = "Servo";  //Prefiks pliku scenariusza
 int servoIndex[SERVOS];  //Numer serwomechanizmu z nazwy pliku
 int fileSize[SERVOS];    //Liczba linijek scenariusza
 int numOfFiles = 0;      //Liczba plików scenariusza na karcie SD
+bool allFilesEnded = 0; //Flaga czy wszystkie pliki się skończyły; 1 - skończył się, 0 - nie
+
 
 
 void setup() {
@@ -63,45 +65,49 @@ void setup() {
   }
   root.close();
 
-  int **timeStamps = new int *[numOfFiles];  //[plik][linijka] - zapis wszystkich czasów z pliku
-  int **positions = new int *[numOfFiles];  //[plik][linijka] - zapis wszystkich pozycji serwo z pliku
-  int *currentLine = new int[numOfFiles]; //iterator wskazujący linię pliku do której przemieszcza się serwo
-  int *currentPosition = new int[numOfFiles]; //obecna pozycja serwa
-  int *timeStep = new int[numOfFiles]; //krok czasowy - co tyle msec serwo przesuwa się o 1
-  int *direction = new int[numOfFiles]; //kierunek ruchu serwo
-  unsigned long *timeC = new unsigned long[numOfFiles]; //znacznik czasowy zawierający ostatni czas ruchu serwo
-  bool *fileEnded = new bool[numOfFiles]; //flaga czy dany plik się skończył; 1 - skończył się; 0 - nie
-  bool allFilesEnded = 0; // -//- czy wszystkie pliki -//-
-  for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
-    timeStamps[arrayIndex] = new int[fileSize[arrayIndex]];
-    positions[arrayIndex] = new int[fileSize[arrayIndex]];
+  Scenario** scenarios = new Scenario*[numOfFiles];
+  for (int scenarioIndex = 0; scenarioIndex < numOfFiles; scenarioIndex++) {
+     scenarios[scenarioIndex] = new Scenario(fileSize[scenarioIndex]);
   }
+  // int **timeStamps = new int *[numOfFiles];  //[plik][linijka] - zapis wszystkich czasów z pliku
+  // int **positions = new int *[numOfFiles];  //[plik][linijka] - zapis wszystkich pozycji serwo z plikureadStringUntil
+  // int *currentLine = new int[numOfFiles]; //iterator wskazujący linię pliku do której przemieszcza się serwo/
+  // int *currentPosition = new int[numOfFiles]; //obecna pozycja serwa/
+  // int *timeStep = new int[numOfFiles]; //krok czasowy - co tyle msec serwo przesuwa się o 1/
+  // int *direction = new int[numOfFiles]; //kierunek ruchu serwo/
+  // unsigned long *timeC = new unsigned long[numOfFiles]; //znacznik czasowy zawierający ostatni czas ruchu serwo/
+  // bool *fileEnded = new bool[numOfFiles]; //flaga czy dany plik się skończył; 1 - skończył się; 0 - nie/
+  
+  // for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
+  //   timeStamps[arrayIndex] = new int[fileSize[arrayIndex]];
+  //   positions[arrayIndex] = new int[fileSize[arrayIndex]];
+  // }
 
-  for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {  //Przpisywanie .csv do pamięci
-    Serial.println("\n" + filePrefix + servoIndex[arrayIndex] + ".csv");
+  for (int scenarioIndex = 0; scenarioIndex < numOfFiles; scenarioIndex++) {  //Przpisywanie .csv do pamięci
+    Serial.println("\n" + filePrefix + servoIndex[scenarioIndex] + ".csv");
 
-    File file = SD.open("/" + filePrefix + servoIndex[arrayIndex] + ".csv", FILE_READ);
+    File file = SD.open("/" + filePrefix + servoIndex[scenarioIndex] + ".csv", FILE_READ);
 
     int lineIndex = 0;
-    for (int lineIndex = 0; lineIndex < fileSize[arrayIndex] && file.available(); lineIndex++) {
-      timeStamps[arrayIndex][lineIndex] = file.readStringUntil(';').toInt();
-      if (lineIndex != 0 && timeStamps[arrayIndex][lineIndex] == 0) {
+    for (int lineIndex = 0; lineIndex < fileSize[scenarioIndex] && file.available(); lineIndex++) {
+      scenarios[scenarioIndex]->timeStamps[lineIndex] = file.readStringUntil(';').toInt();
+      if (lineIndex != 0 && scenarios[scenarioIndex]->timeStamps[lineIndex] == 0) {
         Serial.println("Error: Incorrect timestamp");
         break;
       }
-      positions[arrayIndex][lineIndex] = file.readStringUntil('\n').toInt();
+      scenarios[scenarioIndex]->positions[lineIndex] = file.readStringUntil('\n').toInt();
 
-      serialPrintLine(timeStamps[arrayIndex][lineIndex], positions[arrayIndex][lineIndex], arrayIndex, lineIndex); //Robocze, wyświetla linijkę pliku
+      serialPrintLine(scenarios[scenarioIndex]->timeStamps[lineIndex], scenarios[scenarioIndex]->positions[lineIndex], scenarioIndex, lineIndex); //Robocze, wyświetla linijkę pliku
     }
   }
 
   Serial.println("time\tfile\tline\tpos");
 
-  for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) { //Przygotowanie do startu scenariusza
-    currentLine[arrayIndex] = 1;
-    fileEnded[arrayIndex] = false;
-    currentPosition[arrayIndex] = positions[arrayIndex][0];
-    serialPrintPositionLine(millis(), arrayIndex, 0, currentPosition[arrayIndex]); //Robocze, ustawienie pozycji początkowej, do zastąpienia przez servo.write
+  for (int scenarioIndex = 0; scenarioIndex < numOfFiles; scenarioIndex++) { //Przygotowanie do startu scenariusza
+    scenarios[scenarioIndex]->currentLine = 1;
+    scenarios[scenarioIndex]->fileEnded = false;
+    scenarios[scenarioIndex]->currentPosition = scenarios[scenarioIndex]->positions[0];
+    serialPrintPositionLine(millis(), scenarioIndex, 0, scenarios[scenarioIndex]->currentPosition); //Robocze, ustawienie pozycji początkowej, do zastąpienia przez servo.write
   }
 
   Serial.println("\nSTART SCENARIO?\n");
@@ -110,31 +116,31 @@ void setup() {
 
   unsigned long time1 = millis(); //czas startu scenariusza
 
-   for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
-    timeC[arrayIndex] = millis();
-    calcStepDir(arrayIndex, currentLine, positions, direction, timeStep, timeStamps, timeC, time1);
+   for (int scenarioIndex = 0; scenarioIndex < numOfFiles; scenarioIndex++) {
+    scenarios[scenarioIndex]->lastTime= millis();
+    calcStepDir(scenarios, scenarioIndex, time1);
   }
   
   while (!allFilesEnded) {  //czytanie(w przyszłości serwo.write) pozycji w czasie
-    for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
-      if ((millis() >= (timeC[arrayIndex] + timeStep[arrayIndex])) && (fileEnded[arrayIndex] == false)) {
-        currentPosition[arrayIndex] += direction[arrayIndex];
-        timeC[arrayIndex] = millis();
+    for (int scenarioIndex = 0; scenarioIndex < numOfFiles; scenarioIndex++) {
+      if ((millis() >= (scenarios[scenarioIndex]->lastTime + scenarios[scenarioIndex]->timeStep)) && (scenarios[scenarioIndex]->fileEnded == false)) {
+        scenarios[scenarioIndex]->currentPosition += scenarios[scenarioIndex]->direction;
+        scenarios[scenarioIndex]->lastTime = millis();
 
-        serialPrintPositionLine(millis() - time1, arrayIndex, currentLine[arrayIndex], currentPosition[arrayIndex]); //Robocze, do zastąpienia przez servo.write
+        serialPrintPositionLine(millis() - time1, scenarioIndex, scenarios[scenarioIndex]->currentLine, scenarios[scenarioIndex]->currentPosition); //Robocze, do zastąpienia przez servo.write
 
-        if (currentPosition[arrayIndex] == positions[arrayIndex][currentLine[arrayIndex]]) {
-          currentLine[arrayIndex]++;
+        if (scenarios[scenarioIndex]->currentPosition == scenarios[scenarioIndex]->positions[scenarios[scenarioIndex]->currentLine]) {
+          scenarios[scenarioIndex]->currentLine++;
 
-          if (currentLine[arrayIndex] == fileSize[arrayIndex]) {
-            fileEnded[arrayIndex] = true;
+          if (scenarios[scenarioIndex]->currentLine == fileSize[scenarioIndex]) {
+            scenarios[scenarioIndex]->fileEnded = true;
 
             allFilesEnded = 1;
-            for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) {
-              allFilesEnded = allFilesEnded * fileEnded[arrayIndex];
+            for (int scenarioIndex = 0; scenarioIndex < numOfFiles; scenarioIndex++) {
+              allFilesEnded = allFilesEnded * scenarios[scenarioIndex]->fileEnded;
             }
           } else {
-            calcStepDir(arrayIndex, currentLine, positions, direction, timeStep, timeStamps, timeC, time1); //Obliczenie kroku czasu, kierunku i czasu startu ruchu
+            calcStepDir(scenarios, scenarioIndex, time1); //Obliczenie kroku czasu, kierunku i czasu startu ruchu
           }
         }
       }
@@ -145,18 +151,7 @@ void setup() {
   Serial.println("\nEND OF ALL FILES.");
   
   
-  for (int arrayIndex = 0; arrayIndex < numOfFiles; arrayIndex++) { //usuwanie dynamicznych
-    delete[] timeStamps[arrayIndex];
-    delete[] positions[arrayIndex];
-  }
-  delete[] timeStamps;  
-  delete[] positions;
-  delete[] currentLine;
-  delete[] currentPosition;
-  delete[] timeStep;
-  delete[] direction;
-  delete[] timeC;
-  delete[] fileEnded;
+  delete[] scenarios;
   Serial.println("Deleted dynamic arrays");  //roboczo
 }
 

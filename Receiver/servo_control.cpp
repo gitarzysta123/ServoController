@@ -1,4 +1,5 @@
 #include <SD.h>
+#include "Scenario.h"
 #include "servo_control.h"
 
 
@@ -55,29 +56,29 @@ void serialPrintPositionLine(unsigned long _time1, int _array_index, int _curren
   Serial.println(_position);
 }
 
-void calcStepDir(int _array_index, int _current_line[], int* _positions[], int _direction[], int _time_step[], int* _time_stamps[], unsigned long _time_mark[], unsigned long _time_start) {
-  int _last_line = _current_line[_array_index] - 1;
-  int posDiff = _positions[_array_index][_current_line[_array_index]] - _positions[_array_index][_last_line];
+void calcStepDir(Scenario* scenarios[], int _array_index, unsigned long _time_start) {
+  int _last_line = (scenarios[_array_index]->currentLine) - 1;
+  int posDiff = scenarios[_array_index]->positions[scenarios[_array_index]->currentLine] - scenarios[_array_index]->positions[_last_line];
   if (posDiff > 0) {
-    _direction[_array_index] = 1;
+    scenarios[_array_index]->direction = 1;
   } else if (posDiff < 0) {
-    _direction[_array_index] = -1;
+    scenarios[_array_index]->direction = -1;
   } else {
-    _direction[_array_index] = 0;
+    scenarios[_array_index]->direction = 0;
   }
 
   posDiff = abs(posDiff);
 
   if (posDiff != 0) {
-    _time_step[_array_index] = (_time_stamps[_array_index][_current_line[_array_index]] - _time_stamps[_array_index][_last_line]) / posDiff;
+    scenarios[_array_index]->timeStep = (scenarios[_array_index]->timeStamps[scenarios[_array_index]->currentLine] - scenarios[_array_index]->timeStamps[_last_line]) / posDiff;
   } else {
-    _time_step[_array_index] = _time_stamps[_array_index][_current_line[_array_index]] - _time_stamps[_array_index][_last_line];
+    scenarios[_array_index]->timeStep = scenarios[_array_index]->timeStamps[scenarios[_array_index]->currentLine] - scenarios[_array_index]->timeStamps[_last_line];
   }
 
   Serial.print("Timestep ");
   Serial.print(_array_index);
   Serial.print(" : ");
-  Serial.println(_time_step[_array_index]);
+  Serial.println(scenarios[_array_index]->timeStep);
 
-  _time_mark[_array_index] = _time_start + (unsigned long)(_time_stamps[_array_index][_last_line]);
+  scenarios[_array_index]->lastTime = _time_start + (unsigned long)(scenarios[_array_index]->timeStamps[_last_line]);
 }
