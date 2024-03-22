@@ -7,12 +7,15 @@ struct Scenario {
   bool fileEnded = 1;      //flaga czy dany plik się skończył; 1 - skończył się; 0 - nie
 
   int fileSize;
+  int servoIndex;
+  bool servoEnable;
 
   int* timeStamps;
   int* positions;
-  Scenario();
-  Scenario(int _file_size) {
+  Scenario(int _file_size, int _servo_index, bool _servo_enable) {
     fileSize = _file_size;
+    servoIndex = _servo_index;
+    servoEnable = _servo_enable;
     timeStamps = new int[fileSize];
     positions = new int[fileSize];
   }

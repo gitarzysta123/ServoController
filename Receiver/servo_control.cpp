@@ -126,22 +126,28 @@ void getFilesData(String _file_prefix, int& _num_of_files, int _file_size[], int
   root.close();
 }
 
-bool copyFiles(Scenario* scenarios[], String _file_prefix, int _num_of_files, int _file_size[], int _servo_index[]) {
+bool copyFiles(Scenario* scenarios[], String _file_prefix, int _num_of_files) {
   for (int scenarioIndex = 0; scenarioIndex < _num_of_files; scenarioIndex++) {  //Przpisywanie .csv do pamięci
-    Serial.println("\n" + _file_prefix + _servo_index[scenarioIndex] + ".csv");
+    Serial.println("\n" + String(_file_prefix) + String(scenarios[scenarioIndex]->servoIndex) + ".csv");
 
-    File file = SD.open("/" + _file_prefix + _servo_index[scenarioIndex] + ".csv", FILE_READ);
+    if (scenarios[scenarioIndex]->servoEnable == 0) {
+      Serial.println("Scenario for servo " + String(scenarios[scenarioIndex]->servoIndex) +  " won't be loaded.");
 
-    int lineIndex = 0;
-    for (int lineIndex = 0; lineIndex < _file_size[scenarioIndex] && file.available(); lineIndex++) {
-      scenarios[scenarioIndex]->timeStamps[lineIndex] = file.readStringUntil(';').toInt();
-      if (lineIndex != 0 && scenarios[scenarioIndex]->timeStamps[lineIndex] == 0) {
-        Serial.println("Error: Incorrect timestamp");
-        return false;
+    } else {
+
+      File file = SD.open("/" + _file_prefix + scenarios[scenarioIndex]->servoIndex + ".csv", FILE_READ);
+
+      int lineIndex = 0;
+      for (int lineIndex = 0; lineIndex < scenarios[scenarioIndex]->fileSize && file.available(); lineIndex++) {
+        scenarios[scenarioIndex]->timeStamps[lineIndex] = file.readStringUntil(';').toInt();
+        if (lineIndex != 0 && scenarios[scenarioIndex]->timeStamps[lineIndex] == 0) {
+          Serial.println("Error: Incorrect timestamp");
+          return false;
+        }
+        scenarios[scenarioIndex]->positions[lineIndex] = file.readStringUntil('\n').toInt();
+
+        serialPrintLine(scenarios[scenarioIndex]->timeStamps[lineIndex], scenarios[scenarioIndex]->positions[lineIndex], scenarioIndex, lineIndex);  //Robocze, wyświetla linijkę pliku
       }
-      scenarios[scenarioIndex]->positions[lineIndex] = file.readStringUntil('\n').toInt();
-
-      serialPrintLine(scenarios[scenarioIndex]->timeStamps[lineIndex], scenarios[scenarioIndex]->positions[lineIndex], scenarioIndex, lineIndex);  //Robocze, wyświetla linijkę pliku
     }
   }
   return true;

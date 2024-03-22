@@ -8,9 +8,11 @@
 //bool servoEnable[SERVOS] = {1, 1, 1};
 const String filePrefix = "Servo";  //Prefiks pliku scenariusza
 
-int servoIndex[SERVOS];  //Numer serwomechanizmu z nazwy pliku
-int fileSize[SERVOS];    //Liczba linijek scenariusza
-int numOfFiles = 0;      //Liczba plików scenariusza na karcie SD
+int fileSize[SERVOS];                    //Liczba linijek scenariusza
+int servoIndex[SERVOS];                  //Numer serwomechanizmu z nazwy pliku
+bool servoEnable[SERVOS] = { 1, 1, 1 };  //Które serwo ma działać od początku
+
+int numOfFiles = 0;  //Liczba plików scenariusza na karcie SD
 
 bool allFilesEnded = 1;  //Flaga czy wszystkie pliki się skończyły; 1 - skończył się, 0 - nie
 
@@ -19,17 +21,21 @@ unsigned long startTime;
 void setup() {
   Serial.begin(115200);
   pinMode(0, INPUT_PULLUP);
-  while (digitalRead(0)) {}     // CZEKA NA PRZYCISK ID0
-  delay(2000);                  //roboczo
+  while (digitalRead(0)) {}  // CZEKA NA PRZYCISK ID0
+  delay(2000);               //roboczo
 
   getFilesData(filePrefix, numOfFiles, fileSize, servoIndex);
 
   Scenario** scenarios = new Scenario*[numOfFiles];
   for (int scenarioIndex = 0; scenarioIndex < numOfFiles; scenarioIndex++) {
-    scenarios[scenarioIndex] = new Scenario(fileSize[scenarioIndex]);
+    if (servoEnable[scenarioIndex] == 1) {
+      scenarios[scenarioIndex] = new Scenario(fileSize[scenarioIndex], servoIndex[scenarioIndex], servoEnable[scenarioIndex]);
+    } else {
+      Serial.println("No memory reserved for scenario nr" + String(scenarioIndex));
+    }
   }
 
-  copyFiles(scenarios, filePrefix, numOfFiles, fileSize, servoIndex);
+  copyFiles(scenarios, filePrefix, numOfFiles);
 
   setStartPosition(scenarios, numOfFiles);
 
