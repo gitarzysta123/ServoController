@@ -45,8 +45,7 @@ void setup() {
 
   startScenarios(scenarios, numOfFiles, startTime, allFilesEnded);
 
-  while (handleScenarios(scenarios, numOfFiles, startTime, allFilesEnded))
-    ;
+  while (handleScenarios(scenarios, numOfFiles, startTime, allFilesEnded));
 
   Serial.println("\nEND OF ALL FILES.");
 
