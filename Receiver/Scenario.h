@@ -14,9 +14,9 @@ struct Scenario {
   int* positions;
   Scenario(int _file_size, int _servo_index, bool _servo_enable) {
     servoEnable = _servo_enable;
+    servoIndex = _servo_index;
     if (_servo_enable) {
       fileSize = _file_size;
-      servoIndex = _servo_index;
 
       timeStamps = new int[fileSize];
       positions = new int[fileSize];

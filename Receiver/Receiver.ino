@@ -10,7 +10,7 @@ const String filePrefix = "Servo";  //Prefiks pliku scenariusza
 
 int fileSize[SERVOS];                    //Liczba linijek scenariusza
 int servoIndex[SERVOS];                  //Numer serwomechanizmu z nazwy pliku
-bool servoEnable[SERVOS] = { 1, 1, 1 };  //Które serwo ma działać od początku
+bool servoEnable[SERVOS] = { 0, 1, 1 };  //Które serwo ma działać od początku ( Servo nr. {1., 2., 3., itd})
 
 int numOfFiles = 0;  //Liczba plików scenariusza na karcie SD
 
@@ -28,10 +28,10 @@ void setup() {
 
   Scenario** scenarios = new Scenario*[numOfFiles];
   for (int scenarioIndex = 0; scenarioIndex < numOfFiles; scenarioIndex++) {
-    if (servoEnable[scenarioIndex] == 1) {
-      scenarios[scenarioIndex] = new Scenario(fileSize[scenarioIndex], servoIndex[scenarioIndex], servoEnable[scenarioIndex]);
-    } else {
-      Serial.println("No memory reserved for scenario nr" + String(scenarioIndex));
+    scenarios[scenarioIndex] = new Scenario(fileSize[scenarioIndex], servoIndex[scenarioIndex], servoEnable[servoIndex[scenarioIndex] - 1]);
+    if (servoEnable[servoIndex[scenarioIndex] - 1] == false) {
+      Serial.print("No memory reserved for scenario nr" + String(scenarioIndex));
+      Serial.println("; servo nr " + String(servoIndex[scenarioIndex]));
     }
   }
 

@@ -131,7 +131,7 @@ bool copyFiles(Scenario* scenarios[], String _file_prefix, int _num_of_files) {
     Serial.println("\n" + String(_file_prefix) + String(scenarios[scenarioIndex]->servoIndex) + ".csv");
 
     if (scenarios[scenarioIndex]->servoEnable == 0) {
-      Serial.println("Scenario for servo " + String(scenarios[scenarioIndex]->servoIndex) +  " won't be loaded.");
+      Serial.println("Scenario for servo " + String(scenarios[scenarioIndex]->servoIndex) + " won't be loaded.");
 
     } else {
 
@@ -156,9 +156,14 @@ bool copyFiles(Scenario* scenarios[], String _file_prefix, int _num_of_files) {
 void setStartPosition(Scenario* scenarios[], int _num_of_files) {
   Serial.println("time\tfile\tline\tpos");
   for (int scenarioIndex = 0; scenarioIndex < _num_of_files; scenarioIndex++) {  //Przygotowanie do startu scenariusza
-    scenarios[scenarioIndex]->currentLine = 1;
-    scenarios[scenarioIndex]->currentPosition = scenarios[scenarioIndex]->positions[0];
-    serialPrintPositionLine(millis(), scenarioIndex, 0, scenarios[scenarioIndex]->currentPosition);  //Robocze, ustawienie pozycji początkowej, do zastąpienia przez servo.write
+    if (scenarios[scenarioIndex]->servoEnable == false) {
+      Serial.print("Won't start scenario nr " + String(scenarioIndex));
+      Serial.println("; servo nr " + String(scenarios[scenarioIndex]->servoIndex));
+    } else {
+      scenarios[scenarioIndex]->currentLine = 1;
+      scenarios[scenarioIndex]->currentPosition = scenarios[scenarioIndex]->positions[0];
+      serialPrintPositionLine(millis(), scenarioIndex, 0, scenarios[scenarioIndex]->currentPosition);  //Robocze, ustawienie pozycji początkowej, do zastąpienia przez servo.write
+    }
   }
 }
 
@@ -167,9 +172,14 @@ void startScenarios(Scenario* scenarios[], int _num_of_files, unsigned long& _st
   _all_files_ended = 0;
 
   for (int scenarioIndex = 0; scenarioIndex < _num_of_files; scenarioIndex++) {
-    scenarios[scenarioIndex]->lastTime = millis();
-    calcStepDir(scenarios, scenarioIndex, _start_time);  //Obliczenie kroku czasu, kierunku i czasu startu ruchu
-    scenarios[scenarioIndex]->fileEnded = false;
+    if (scenarios[scenarioIndex]->servoEnable == false) {
+      Serial.print("Didn't start scenario nr " + String(scenarioIndex));
+      Serial.println("; servo nr " + String(scenarios[scenarioIndex]->servoIndex));
+    } else {
+      scenarios[scenarioIndex]->lastTime = millis();
+      calcStepDir(scenarios, scenarioIndex, _start_time);  //Obliczenie kroku czasu, kierunku i czasu startu ruchu
+      scenarios[scenarioIndex]->fileEnded = false;
+    }
   }
   Serial.println("time\tfile\tline\tpos");
 }
@@ -177,24 +187,26 @@ void startScenarios(Scenario* scenarios[], int _num_of_files, unsigned long& _st
 bool handleScenarios(Scenario* scenarios[], int _num_of_files, unsigned long& _start_time, bool& _all_files_ended) {
   if (!_all_files_ended) {  //czytanie(w przyszłości serwo.write) pozycji w czasie
     for (int scenarioIndex = 0; scenarioIndex < _num_of_files; scenarioIndex++) {
-      if ((millis() >= (scenarios[scenarioIndex]->lastTime + scenarios[scenarioIndex]->timeStep)) && (scenarios[scenarioIndex]->fileEnded == false)) {
-        scenarios[scenarioIndex]->currentPosition += scenarios[scenarioIndex]->direction;
-        scenarios[scenarioIndex]->lastTime = millis();
+      if (scenarios[scenarioIndex]->servoEnable == true) {
+        if ((scenarios[scenarioIndex]->fileEnded == false) && (millis() >= (scenarios[scenarioIndex]->lastTime + scenarios[scenarioIndex]->timeStep))) {
+          scenarios[scenarioIndex]->currentPosition += scenarios[scenarioIndex]->direction;
+          scenarios[scenarioIndex]->lastTime = millis();
 
-        serialPrintPositionLine(millis() - _start_time, scenarioIndex, scenarios[scenarioIndex]->currentLine, scenarios[scenarioIndex]->currentPosition);  //Robocze, do zastąpienia przez servo.write
+          serialPrintPositionLine(millis() - _start_time, scenarioIndex, scenarios[scenarioIndex]->currentLine, scenarios[scenarioIndex]->currentPosition);  //Robocze, do zastąpienia przez servo.write
 
-        if (scenarios[scenarioIndex]->currentPosition == scenarios[scenarioIndex]->positions[scenarios[scenarioIndex]->currentLine]) {
-          scenarios[scenarioIndex]->currentLine++;
+          if (scenarios[scenarioIndex]->currentPosition == scenarios[scenarioIndex]->positions[scenarios[scenarioIndex]->currentLine]) {
+            scenarios[scenarioIndex]->currentLine++;
 
-          if (scenarios[scenarioIndex]->currentLine == scenarios[scenarioIndex]->fileSize) {
-            scenarios[scenarioIndex]->fileEnded = true;
+            if (scenarios[scenarioIndex]->currentLine == scenarios[scenarioIndex]->fileSize) {
+              scenarios[scenarioIndex]->fileEnded = true;
 
-            _all_files_ended = 1;
-            for (int scenarioIndex = 0; scenarioIndex < _num_of_files; scenarioIndex++) {
-              _all_files_ended = _all_files_ended && scenarios[scenarioIndex]->fileEnded;
+              _all_files_ended = 1;
+              for (int scenarioIndex = 0; scenarioIndex < _num_of_files; scenarioIndex++) {
+                _all_files_ended = _all_files_ended && scenarios[scenarioIndex]->fileEnded;
+              }
+            } else {
+              calcStepDir(scenarios, scenarioIndex, _start_time);  //Obliczenie kroku czasu, kierunku i czasu startu ruchu
             }
-          } else {
-            calcStepDir(scenarios, scenarioIndex, _start_time);  //Obliczenie kroku czasu, kierunku i czasu startu ruchu
           }
         }
       }
